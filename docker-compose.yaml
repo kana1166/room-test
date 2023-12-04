@@ -1,0 +1,19 @@
+version: "3.1"
+
+services:
+  db:
+    image: mysql:latest
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword # MySQLのrootユーザーのパスワード
+      MYSQL_DATABASE: mydatabase # 作成するデータベース名
+      MYSQL_USER: user # 新規ユーザー名
+      MYSQL_PASSWORD: userpassword # 新規ユーザーのパスワード
+    ports:
+      - "3306:3306" # ホストマシンの3306ポートとコンテナの3306ポートをバインド
+    volumes:
+      - my-db:/var/lib/mysql
+
+volumes:
+  my-db:

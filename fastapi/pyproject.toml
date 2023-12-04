@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "room-python"
+name = "room-test"
 version = "0.1.0"
 description = ""
 authors = ["kana <k.salon.du.l@gmail.com>"]
@@ -12,6 +12,7 @@ sqlalchemy = "^2.0.23"
 pymysql = "^1.1.0"
 uvicorn = "^0.24.0.post1"
 fastapi = "^0.104.1"
+requests = "^2.31.0"
 
 
 [build-system]

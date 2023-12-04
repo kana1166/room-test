@@ -1,36 +1,15 @@
+from typing import List
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
-from typing import List
-from fastapi.middleware.cors import CORSMiddleware
 import crud, models, schemas
 from database import engine
 from session import SessionLocal
 
-# setup_logger 関数のインポート
-from logger_config import setup_logger
-
-
-logger = setup_logger()
-
-
-# データベーステーブルを作成
 models.Base.metadata.create_all(bind=engine)
 
-# FastAPIのインスタンスを作成
 app = FastAPI()
 
 
-# CORSミドルウェアの設定
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3001"],  # Next.jsサーバーのURL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# データベースセッションの依存関係
 def get_db():
     db = SessionLocal()
     try:
@@ -40,39 +19,40 @@ def get_db():
 
 
 @app.get("/")
-def read_root():
+async def index():
     return {"message": "Success"}
 
 
-@app.post("/articles/", response_model=schemas.Article)
-def create_article(article: schemas.ArticleCreate, db: Session = Depends(get_db)):
-    new_article = crud.create_article(
-        db=db, title=article.title, content=article.content
-    )
-    return new_article
+# Read
+@app.get("/users", response_model=List[schemas.User])
+async def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = crud.get_user(db, skip=skip, limit=limit)
+    return users
 
 
-@app.get("/articles/", response_model=List[schemas.Article])
-def read_articles(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-    articles = crud.get_articles(db, skip=skip, limit=limit)
-    return articles
+@app.get("/rooms", response_model=List[schemas.Room])
+async def rooms(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    rooms = crud.get_rooms(db, skip=skip, limit=limit)
+    return rooms
 
 
-@app.get("/articles/{article_id}", response_model=schemas.Article)
-def read_article(article_id: int, db: Session = Depends(get_db)):
-    return crud.get_article(db, article_id=article_id)
+@app.get("/bookings", response_model=List[schemas.Booking])
+async def bookings(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    bookings = crud.get_bookings(db, skip=skip, limit=limit)
+    return bookings
 
 
-@app.put("/articles/{article_id}", response_model=schemas.Article)
-def update_article(
-    article_id: int, article: schemas.ArticleCreate, db: Session = Depends(get_db)
-):
-    return crud.update_article(
-        db=db, article_id=article_id, title=article.title, content=article.content
-    )
+# create_user
+@app.post("/users", response_model=schemas.User)
+async def create_user(user: schemas.User, db: Session = Depends(get_db)):
+    return crud.create_user(db=db, user=user)
 
 
-@app.delete("/articles/{article_id}")
-def delete_article(article_id: int, db: Session = Depends(get_db)):
-    crud.delete_article(db=db, article_id=article_id)
-    return {"detail": "Article deleted"}
+@app.post("/rooms", response_model=schemas.Room)
+async def create_room(room: schemas.Room, db: Session = Depends(get_db)):
+    return crud.create_room(db=db, room=room)
+
+
+@app.post("/bookings", response_model=schemas.Booking)
+async def create_bookings(booking: schemas.Booking, db: Session = Depends(get_db)):
+    return crud.create_booking(db=db, booking=booking)
