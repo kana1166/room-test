@@ -1,48 +1,50 @@
-# crud.py
 from sqlalchemy.orm import Session
-from models import Article
-import datetime
+import models, schemas
 
 
-def create_article(
-    db: Session,
-    title: str,
-    content: str,
-):
-    db_article = Article(
-        title=title,
-        content=content,
-        created_at=datetime.datetime.now(),
-    )
-    db.add(db_article)
+# ユーザー一覧を取得する
+def get_user(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.User).offset(skip).limit(limit).all()
+
+
+# 会議室一覧を取得する
+def get_rooms(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Room).offset(skip).limit(limit).all()
+
+
+# 予約一覧を取得する
+def get_bookings(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Booking).offset(skip).limit(limit).all()
+
+
+# ユーザーを登録する
+def create_user(db: Session, user: schemas.User):
+    db_user = models.User(username=user.username)
+    db.add(db_user)
     db.commit()
-    db.refresh(db_article)
-    return db_article
+    db.refresh(db_user)
+    return db_user
 
 
-def get_article(db: Session, article_id: int):
-    return db.query(Article).filter(Article.id == article_id).first()
+# 会議室を登録する
+def create_room(db: Session, room: schemas.Room):
+    db_room = models.Room(room_name=room.room_name, capacity=room.capacity)
+    db.add(db_room)
+    db.commit()
+    db.refresh(db_room)
+    return db_room
 
 
-def get_articles(db: Session, skip: int = 0, limit: int = 10):
-    return db.query(Article).offset(skip).limit(limit).all()
-
-
-def update_article(db: Session, article_id: int, title: str, content: str):
-    db_article = db.query(Article).filter(Article.id == article_id).first()
-    if db_article:
-        db_article.title = title
-        db_article.content = content
-        db.commit()
-        db.refresh(db_article)
-        return db_article
-    return None
-
-
-def delete_article(db: Session, article_id: int):
-    db_article = db.query(Article).filter(Article.id == article_id).first()
-    if db_article:
-        db.delete(db_article)
-        db.commit()
-        return True
-    return False
+# 予約を登録する
+def create_booking(db: Session, booking: schemas.Booking):
+    db_booking = models.Booking(
+        user_id=booking.user_id,
+        room_id=booking.room_id,
+        booked_num=booking.booked_num,
+        start_datetime=booking.start_datetime,
+        end_datetime=booking.end_datetime,
+    )
+    db.add(db_booking)
+    db.commit()
+    db.refresh(db_booking)
+    return db_booking
