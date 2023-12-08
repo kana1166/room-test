@@ -1,5 +1,6 @@
 # database.py
 from sqlalchemy import create_engine
+from models import Base
 
 # Docker Composeで設定したMySQLへの接続情報を設定
 username = "user"  # Docker Composeファイルで設定したユーザー名
@@ -11,3 +12,9 @@ database = "mydatabase"  # Docker Composeファイルで設定したデータベ
 engine = create_engine(
     f"mysql+pymysql://{username}:{password}@{host}/{database}", echo=True
 )
+
+# テーブルの削除
+# Base.metadata.drop_all(engine)
+
+# テーブルの再作成
+# Base.metadata.create_all(engine)
