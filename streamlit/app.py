@@ -1,43 +1,337 @@
 import streamlit as st
-import random
 import requests
-import json
 
-page = st.sidebar.selectbox("Choose your page", ["users", "rooms", "bookings"])
-if page == "users":
-    st.title("ユーザー登録画面 ")
-    with st.form(key="user"):
-        user_id: int = random.randint(0, 10)
-        username: str = st.text_input("ユーザー名", max_chars=12)
-        data = {"user_id": user_id, "username": username}
-        submit_button = st.form_submit_button(label="リクエスト送信")
+# FastAPIサーバーのURL
+BASE_URL = "http://127.0.0.1:8000"
 
-    if submit_button:
-        st.write("##送信データ")
-        st.json(data)
-        st.write("##レスポンスデータ")
-        url = "http://127.0.0.1:8000/users"
-        headers = {"Content-Type": "application/json"}  # JSONデータを送信するためのヘッダー
-        res = requests.post(url, data=json.dumps(data), headers=headers)
-        if res.status_code == 200:
-            st.success("登録完了")
-        st.write(res.status_code)
-        st.json(res.json())
 
-elif page == "rooms":
-    st.title("会議室画面")
+# ユーザー関連の関数
+def list_users():
+    response = requests.get(f"{BASE_URL}/users/")
+    if response.status_code == 200:
+        users = response.json()
+        for user in users:
+            st.write(user)
 
-    with st.form(key="room"):
-        room_id: int = random.randint(0, 10)
-        room_name: str = st.text_input("ユーザー名", max_chars=12)
-        capacity: int = st.number_input("定員", step=1)
-        data = {"room_id": room_id, "room_name": room_name, "capacity": capacity}
-        submit_button = st.form_submit_button(label="リクエスト送信")
 
-    if submit_button:
-        st.write("##送信データ")
-        st.json(data)
-        st.write("##レスポンスデータ")
-        url = "http://127.0.0.1:8000/rooms"
-        headers = {"Content-Type": "application/json"}  # JSONデータを送信するためのヘッダー
-        res = requests.post(url, data=json.dumps(data), headers=headers)
+def create_user():
+    with st.form("Create User"):
+        username = st.text_input("Username", max_chars=12)
+        email = st.text_input("Email")
+        role = st.text_input("Role", max_chars=12)
+        password = st.text_input("Password", type="password")  # パスワード入力フィールドを追加
+        submitted = st.form_submit_button("Create")
+        if submitted:
+            response = requests.post(
+                f"{BASE_URL}/users/",
+                json={
+                    "username": username,
+                    "email": email,
+                    "role": role,
+                    "password": password,
+                },  # パスワードも送信
+            )
+            if response.status_code == 200:
+                st.success("User created successfully!")
+            else:
+                st.error(f"Failed to create user: {response.text}")
+
+
+def update_user():
+    with st.form("Update User"):
+        user_id = st.text_input("User ID")
+        username = st.text_input("Username")
+        email = st.text_input("Email")
+        role = st.text_input("Role")
+        submitted = st.form_submit_button("Update")
+        if submitted:
+            response = requests.put(
+                f"{BASE_URL}/users/{user_id}",
+                json={"username": username, "email": email, "role": role},
+            )
+            if response.status_code == 200:
+                st.success("User updated successfully!")
+            else:
+                st.error("Failed to update user")
+
+
+def delete_user():
+    with st.form("Delete User"):
+        user_id = st.text_input("User ID")
+        submitted = st.form_submit_button("Delete")
+        if submitted:
+            response = requests.delete(f"{BASE_URL}/users/{user_id}")
+            if response.status_code == 200:
+                st.success("User deleted successfully!")
+            else:
+                st.error("Failed to delete user")
+
+
+# 会議室関連の関数
+def list_rooms():
+    response = requests.get(f"{BASE_URL}/rooms/")
+    if response.status_code == 200:
+        rooms = response.json()
+        for room in rooms:
+            st.write(room)
+
+
+def create_room():
+    with st.form("Create Room"):
+        room_name = st.text_input("Room Name")
+        capacity = st.number_input("Capacity", min_value=1, format="%d")  # 数字入力
+        photo_url = st.text_input("Photo URL")
+        executive = st.selectbox("Executive", ["Yes", "No"])  # ドロップダウンメニュー
+        submitted = st.form_submit_button("Create")
+        if submitted:
+            # executiveの値をブーリアンに変換
+            executive_bool = executive == "Yes"
+
+            response = requests.post(
+                f"{BASE_URL}/rooms/",
+                json={
+                    "room_name": room_name,
+                    "capacity": capacity,
+                    "photo_url": photo_url,
+                    "executive": executive_bool,
+                },
+            )
+            if response.status_code == 200:
+                st.success("Room created successfully!")
+            else:
+                st.error("Failed to create room")
+
+
+def update_room():
+    with st.form("Update Room"):
+        room_id = st.text_input("Room ID")
+        room_name = st.text_input("Room Name")
+        capacity = st.text_input("Capacity")
+        photo_url = st.text_input("Photo URL")
+        executive = st.text_input("Executive")
+        submitted = st.form_submit_button("Update")
+        if submitted:
+            response = requests.put(
+                f"{BASE_URL}/rooms/{room_id}",
+                json={
+                    "room_name": room_name,
+                    "capacity": capacity,
+                    "photo_url": photo_url,
+                    "executive": executive,
+                },
+            )
+            if response.status_code == 200:
+                st.success("Room updated successfully!")
+            else:
+                st.error("Failed to update room")
+
+
+def delete_room():
+    with st.form("Delete Room"):
+        room_id = st.text_input("Room ID")
+        submitted = st.form_submit_button("Delete")
+        if submitted:
+            response = requests.delete(f"{BASE_URL}/rooms/{room_id}")
+            if response.status_code == 200:
+                st.success("Room deleted successfully!")
+            else:
+                st.error("Failed to delete room")
+
+
+# 予約関連の関数
+def list_bookings():
+    response = requests.get(f"{BASE_URL}/bookings/")
+    if response.status_code == 200:
+        bookings = response.json()
+        for booking in bookings:
+            st.write(booking)
+
+
+from datetime import datetime
+
+
+def create_booking():
+    with st.form("Create Booking"):
+        user_id = st.number_input("User ID", min_value=1, format="%d")
+        room_id = st.number_input("Room ID", min_value=1, format="%d")
+        booked_num = st.number_input("Booked Num", min_value=1, format="%d")
+        start_datetime = st.text_input("Start Datetime", "2021-01-01T01:00:00")
+        end_datetime = st.text_input("End Datetime", "2021-01-01T02:00:00")
+        submitted = st.form_submit_button("Create")
+        if submitted:
+            try:
+                # 日時の形式を確認（エラーがあれば例外が発生）
+                start_dt = datetime.fromisoformat(start_datetime)
+                end_dt = datetime.fromisoformat(end_datetime)
+
+                response = requests.post(
+                    f"{BASE_URL}/bookings/",
+                    json={
+                        "user_id": user_id,
+                        "room_id": room_id,
+                        "booked_num": booked_num,
+                        "start_datetime": start_datetime,
+                        "end_datetime": end_datetime,
+                    },
+                )
+                if response.status_code == 200:
+                    st.success("Booking created successfully!")
+                else:
+                    st.error(f"Failed to create booking: {response.text}")
+            except ValueError as e:
+                st.error(f"Invalid date format: {e}")
+
+
+def update_booking():
+    with st.form("Update Booking"):
+        booking_id = st.text_input("Booking ID")
+        user_id = st.text_input("User ID")
+        room_id = st.text_input("Room ID")
+        booked_num = st.text_input("Booked Num")
+        start_datetime = st.text_input("Start Datetime")
+        end_datetime = st.text_input("End Datetime")
+        submitted = st.form_submit_button("Update")
+        if submitted:
+            response = requests.put(
+                f"{BASE_URL}/bookings/{booking_id}",
+                json={
+                    "user_id": user_id,
+                    "room_id": room_id,
+                    "booked_num": booked_num,
+                    "start_datetime": start_datetime,
+                    "end_datetime": end_datetime,
+                },
+            )
+            if response.status_code == 200:
+                st.success("Booking updated successfully!")
+            else:
+                st.error("Failed to update booking")
+
+
+def delete_booking():
+    with st.form("Delete Booking"):
+        booking_id = st.text_input("Booking ID")
+        submitted = st.form_submit_button("Delete")
+        if submitted:
+            response = requests.delete(f"{BASE_URL}/bookings/{booking_id}")
+            if response.status_code == 200:
+                st.success("Booking deleted successfully!")
+            else:
+                st.error("Failed to delete booking")
+
+
+# ゲストユーザー関連の関数
+def list_guest_users():
+    response = requests.get(f"{BASE_URL}/guest_users/")
+    if response.status_code == 200:
+        guest_users = response.json()
+        for guest_user in guest_users:
+            st.write(guest_user)
+
+
+def create_guest_user():
+    with st.form("Create Guest User"):
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        reservation_id = st.text_input("Reservation ID")
+        submitted = st.form_submit_button("Create")
+        if submitted:
+            response = requests.post(
+                f"{BASE_URL}/guest_users/",
+                json={"name": name, "email": email, "reservation_id": reservation_id},
+            )
+            if response.status_code == 200:
+                st.success("Guest User created successfully!")
+            else:
+                st.error("Failed to create guest user")
+
+
+def update_guest_user():
+    with st.form("Update Guest User"):
+        guest_user_id = st.text_input("Guest User ID")
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        reservation_id = st.text_input("Reservation ID")
+        submitted = st.form_submit_button("Update")
+        if submitted:
+            response = requests.put(
+                f"{BASE_URL}/guest_users/{guest_user_id}",
+                json={"name": name, "email": email, "reservation_id": reservation_id},
+            )
+            if response.status_code == 200:
+                st.success("Guest User updated successfully!")
+            else:
+                st.error("Failed to update guest user")
+
+
+def delete_guest_user():
+    with st.form("Delete Guest User"):
+        guest_user_id = st.text_input("Guest User ID")
+        submitted = st.form_submit_button("Delete")
+        if submitted:
+            response = requests.delete(f"{BASE_URL}/guest_users/{guest_user_id}")
+            if response.status_code == 200:
+                st.success("Guest User deleted successfully!")
+            else:
+                st.error("Failed to delete guest user")
+
+
+# サイドバーのプルダウンメニュー
+option = st.sidebar.selectbox(
+    "選択してください",
+    (
+        "ユーザーリスト",
+        "ユーザー作成",
+        "ユーザー更新",
+        "ユーザー削除",
+        "会議室リスト",
+        "会議室作成",
+        "会議室更新",
+        "会議室削除",
+        "予約リスト",
+        "予約作成",
+        "予約更新",
+        "予約削除",
+        "ゲストユーザーリスト",
+        "ゲストユーザー作成",
+        "ゲストユーザー更新",
+        "ゲストユーザー削除",
+    ),
+)
+
+
+# 選択されたオプションに応じて機能を表示
+if option == "ユーザーリスト":
+    list_users()
+elif option == "ユーザー作成":
+    create_user()
+elif option == "ユーザー更新":
+    update_user()
+elif option == "ユーザー削除":
+    delete_user()
+elif option == "会議室リスト":
+    list_rooms()
+elif option == "会議室作成":
+    create_room()
+elif option == "会議室更新":
+    update_room()
+elif option == "会議室削除":
+    delete_room()
+elif option == "予約リスト":
+    list_bookings()
+elif option == "予約作成":
+    create_booking()
+elif option == "予約更新":
+    update_booking()
+elif option == "予約削除":
+    delete_booking()
+elif option == "ゲストユーザーリスト":
+    list_guest_users()
+elif option == "ゲストユーザー作成":
+    create_guest_user()
+elif option == "ゲストユーザー更新":
+    update_guest_user()
+elif option == "ゲストユーザー削除":
+    delete_guest_user()
+
+st.sidebar.markdown("[Next.jsアプリケーションに戻る](http://localhost:3000)")
