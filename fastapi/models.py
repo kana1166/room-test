@@ -1,6 +1,8 @@
 # models.py
 from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Boolean
+from sqlalchemy.orm import Session
 from sqlalchemy.ext.declarative import declarative_base
+import models as models
 
 Base = declarative_base()
 
@@ -11,6 +13,8 @@ class User(Base):
     username = Column(String(255), unique=True, index=True)
     email = Column(String(255), unique=True, index=True)
     role = Column(String(255))
+    password_hash = Column(String(255))
+    employee_number = Column(String(255), unique=True, index=True)  # 社員番号を追加
 
 
 class Room(Base):
@@ -40,7 +44,7 @@ class BookingUsers(Base):
     __tablename__ = "booking_users"
     booking_user_id = Column(Integer, primary_key=True, index=True)
     booking_id = Column(
-        Integer, ForeignKey("bookings.booking_id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("bookings.booking_id", ondelete="CASCADE"), nullable=True
     )
     user_id = Column(
         Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
@@ -52,4 +56,4 @@ class GuestUser(Base):
     guest_user_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255))
     email = Column(String(255), unique=True, index=True)
-    booking_id = Column(Integer, ForeignKey("bookings.booking_id"), nullable=False)
+    booking_id = Column(Integer, ForeignKey("bookings.booking_id"), nullable=True)

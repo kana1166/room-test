@@ -1,16 +1,10 @@
 # schemas.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from passlib.context import CryptContext
 from typing import Optional
-from pydantic import BaseModel, Field, EmailStr
-
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-class TokenData(BaseModel):
-    user_id: int  # または必要なフィールド
 
 
 def hash_password(password: str):
@@ -24,18 +18,21 @@ def verify_password(plain_password: str, hashed_password: str):
 # ユーザーの基本情報
 class UserBase(BaseModel):
     username: str = Field(max_length=12)
-    email: EmailStr
     role: str = Field(max_length=12)
+    employee_number: str = Field(max_length=255)  # 社員番号の追加
 
 
 # ユーザーの作成用スキーマ
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(..., min_length=4)
 
 
 # ユーザーの更新用スキーマ
-class UserUpdate(UserBase):
-    password: Optional[str] = None
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(max_length=12)
+    role: Optional[str] = Field(max_length=12)
+    password: Optional[str] = Field(None, min_length=4)
+    employee_number: Optional[str] = Field(max_length=255)  # 社員番号の追加（任意）
 
 
 # ユーザーの読み取り用スキーマ
@@ -102,22 +99,23 @@ class Booking(BookingBase):
 # ゲストユーザーの基本情報
 class GuestUserBase(BaseModel):
     name: str
-    email: EmailStr
+    email: str
 
 
 # ゲストユーザーの作成用スキーマ
 class GuestUserCreate(GuestUserBase):
-    reservation_id: int
+    booking_id: Optional[int] = None
 
 
 # ゲストユーザーの更新用スキーマ
 class GuestUserUpdate(GuestUserBase):
-    reservation_id: Optional[int] = None
+    booking_id: Optional[int] = None
 
 
 # ゲストユーザーの読み取り用スキーマ
 class GuestUser(GuestUserBase):
     guest_user_id: int
+    booking_id: Optional[int] = None
 
     class Config:
         orm_mode = True

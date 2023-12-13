@@ -19,7 +19,8 @@ def create_user():
         username = st.text_input("Username", max_chars=12)
         email = st.text_input("Email")
         role = st.text_input("Role", max_chars=12)
-        password = st.text_input("Password", type="password")  # パスワード入力フィールドを追加
+        employee_number = st.text_input("Employee Number")  # 社員番号の入力フィールドを追加
+        password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Create")
         if submitted:
             response = requests.post(
@@ -29,7 +30,8 @@ def create_user():
                     "email": email,
                     "role": role,
                     "password": password,
-                },  # パスワードも送信
+                    "employee_number": employee_number,  # 社員番号をJSONに含める
+                },
             )
             if response.status_code == 200:
                 st.success("User created successfully!")
@@ -43,11 +45,17 @@ def update_user():
         username = st.text_input("Username")
         email = st.text_input("Email")
         role = st.text_input("Role")
+        employee_number = st.text_input("Employee Number")  # 社員番号の入力フィールドを追加
         submitted = st.form_submit_button("Update")
         if submitted:
             response = requests.put(
                 f"{BASE_URL}/users/{user_id}",
-                json={"username": username, "email": email, "role": role},
+                json={
+                    "username": username,
+                    "email": email,
+                    "role": role,
+                    "employee_number": employee_number,  # 社員番号をJSONに含める
+                },
             )
             if response.status_code == 200:
                 st.success("User updated successfully!")
@@ -160,10 +168,6 @@ def create_booking():
         submitted = st.form_submit_button("Create")
         if submitted:
             try:
-                # 日時の形式を確認（エラーがあれば例外が発生）
-                start_dt = datetime.fromisoformat(start_datetime)
-                end_dt = datetime.fromisoformat(end_datetime)
-
                 response = requests.post(
                     f"{BASE_URL}/bookings/",
                     json={
@@ -233,17 +237,19 @@ def create_guest_user():
     with st.form("Create Guest User"):
         name = st.text_input("Name")
         email = st.text_input("Email")
-        reservation_id = st.text_input("Reservation ID")
+        booking_id = st.text_input("Booking ID")  # 文字列として入力を受け付ける
+
         submitted = st.form_submit_button("Create")
         if submitted:
-            response = requests.post(
-                f"{BASE_URL}/guest_users/",
-                json={"name": name, "email": email, "reservation_id": reservation_id},
-            )
+            guest_user_data = {"name": name, "email": email}
+            if booking_id:  # booking_id が入力されている場合のみ追加
+                guest_user_data["booking_id"] = int(booking_id)
+
+            response = requests.post(f"{BASE_URL}/guest_users/", json=guest_user_data)
             if response.status_code == 200:
                 st.success("Guest User created successfully!")
             else:
-                st.error("Failed to create guest user")
+                st.error(f"Failed to create guest user: {response.text}")
 
 
 def update_guest_user():
@@ -251,12 +257,12 @@ def update_guest_user():
         guest_user_id = st.text_input("Guest User ID")
         name = st.text_input("Name")
         email = st.text_input("Email")
-        reservation_id = st.text_input("Reservation ID")
+        booking_id = st.text_input("Reservation ID")
         submitted = st.form_submit_button("Update")
         if submitted:
             response = requests.put(
                 f"{BASE_URL}/guest_users/{guest_user_id}",
-                json={"name": name, "email": email, "reservation_id": reservation_id},
+                json={"name": name, "email": email, "booking_id": booking_id},
             )
             if response.status_code == 200:
                 st.success("Guest User updated successfully!")

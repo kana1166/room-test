@@ -1,11 +1,29 @@
 # crud.py
 from sqlalchemy.orm import Session
 import models, schemas
+from models import Booking, GuestUser, User
+from security import verify_password, hash_password
 
 
-# ユーザー一覧を取得する
+# 既存のユーザー一覧を取得する関数
 def get_users(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.User).offset(skip).limit(limit).all()
+    return db.query(User).offset(skip).limit(limit).all()
+
+
+# ユーザー認証を行う関数
+def authenticate_user(db: Session, employee_number: str, password: str):
+    user = (
+        db.query(models.User)
+        .filter(models.User.employee_number == employee_number)
+        .first()
+    )
+    if user and verify_password(password, user.password_hash):
+        return user
+    return None
+
+
+def get_user(db: Session, user_id: int):
+    return db.query(User).filter(User.user_id == user_id).first()
 
 
 # 会議室一覧を取得する
@@ -27,7 +45,13 @@ def get_booking(db: Session, skip: int = 0, limit: int = 100):
 
 # ユーザーを登録する
 def create_user(db: Session, user: schemas.UserCreate):
-    db_user = models.User(username=user.username, email=user.email, role=user.role)
+    hashed_password = hash_password(user.password)
+    db_user = models.User(
+        username=user.username,
+        password_hash=hashed_password,
+        role=user.role,
+        employee_number=user.employee_number,  # 社員番号の追加
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -72,9 +96,7 @@ def get_user_role(db: Session, user_id: int) -> str:
 # ゲストユーザーを登録する
 def create_guest_user(db: Session, guest_user: schemas.GuestUserCreate):
     db_guest_user = models.GuestUser(
-        name=guest_user.name,
-        email=guest_user.email,
-        reservation_id=guest_user.reservation_id,
+        name=guest_user.name, email=guest_user.email, booking_id=guest_user.booking_id
     )
     db.add(db_guest_user)
     db.commit()
@@ -132,9 +154,14 @@ def delete_guest_user(db: Session, guest_user_id: int):
 def update_user(db: Session, user_id: int, updated_user: schemas.UserUpdate):
     db_user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if db_user:
-        db_user.username = updated_user.username
-        db_user.email = updated_user.email
-        db_user.role = updated_user.role
+        if updated_user.username is not None:
+            db_user.username = updated_user.username
+        if updated_user.role is not None:
+            db_user.role = updated_user.role
+        if updated_user.password is not None:
+            db_user.password_hash = hash_password(updated_user.password)
+        if updated_user.employee_number is not None:
+            db_user.employee_number = updated_user.employee_number  # 社員番号の更新
         db.commit()
         db.refresh(db_user)
         return db_user
@@ -191,3 +218,72 @@ def update_guest_user(
         db.refresh(db_guest_user)
         return db_guest_user
     return None
+
+
+def get_executive_rooms(db: Session, skip: int = 0, limit: int = 100):
+    return (
+        db.query(models.Room)
+        .filter(models.Room.executive == True)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def create_executive_room(db: Session, room: schemas.RoomCreate):
+    db_room = models.Room(**room.dict(), executive=True)
+    db.add(db_room)
+    db.commit()
+    db.refresh(db_room)
+    return db_room
+
+
+def update_executive_room(db: Session, room_id: int, updated_room: schemas.RoomUpdate):
+    db_room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if db_room is not None:
+        for var, value in vars(updated_room).items():
+            setattr(db_room, var, value) if value else None
+        db.commit()
+        db.refresh(db_room)
+        return db_room
+    return None
+
+
+def delete_executive_room(db: Session, room_id: int):
+    db_room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if db_room is not None:
+        db.delete(db_room)
+        db.commit()
+        return True
+    return False
+
+
+# 1. 予約を作成して自動生成された booking_id を取得
+def create_booking_with_auto_generated_id(
+    db: Session, user_id, room_id, start_datetime, end_datetime, booked_num
+):
+    new_booking = Booking(
+        user_id=user_id,
+        room_id=room_id,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime,
+        booked_num=booked_num,
+    )
+    db.add(new_booking)
+    db.commit()
+    db.refresh(new_booking)
+    return new_booking.booking_id  # 生成された booking_id を返す
+
+
+# 2. 生成された booking_id を使用してゲストユーザーを登録
+def create_guest_user_with_booking_id(db: Session, name, email, booking_id):
+    guest_user = GuestUser(name=name, email=email, booking_id=booking_id)
+    db.add(guest_user)
+    db.commit()
+    db.refresh(guest_user)
+    return guest_user
+
+
+# ゲストユーザー一覧を取得する
+def get_guest_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.GuestUser).offset(skip).limit(limit).all()
