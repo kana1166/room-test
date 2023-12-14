@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, validator
 from datetime import datetime
 from passlib.context import CryptContext
 from typing import Optional
+from pydantic import constr
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -18,7 +19,7 @@ def verify_password(plain_password: str, hashed_password: str):
 # ユーザーの基本情報
 class UserBase(BaseModel):
     username: str = Field(max_length=12)
-    role: str = Field(max_length=12)
+    role: str = Field(..., pattern="^(社員|役員|管理者)$")
     employee_number: str = Field(max_length=255)  # 社員番号の追加
 
 
@@ -30,7 +31,7 @@ class UserCreate(UserBase):
 # ユーザーの更新用スキーマ
 class UserUpdate(BaseModel):
     username: Optional[str] = Field(max_length=12)
-    role: Optional[str] = Field(max_length=12)
+    role: Optional[str] = Field(None, pattern="^(社員|役員|管理者)$")
     password: Optional[str] = Field(None, min_length=4)
     employee_number: Optional[str] = Field(max_length=255)  # 社員番号の追加（任意）
 

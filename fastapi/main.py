@@ -88,20 +88,24 @@ async def get_current_user(
         user_id: str = payload.get("user_id")
         if user_id is None:
             raise credentials_exception
+        user = get_user(db, user_id=user_id)
+        if user is None:
+            raise credentials_exception
+        return user
     except PyJWTError:
         raise credentials_exception
-    user = get_user(db, user_id=payload["user_id"])
-    if user and user.role == payload["role"]:
-        return user
-    raise credentials_exception
+
+
+class LoginRequest(BaseModel):
+    employee_number: str
+    password: str
 
 
 @app.post("/token")
 async def login_for_access_token(
-    form_data: OAuth2PasswordRequestFormCustom = Depends(),
-    db: Session = Depends(get_db),
+    request_data: LoginRequest, db: Session = Depends(get_db)
 ):
-    user = authenticate_user(db, form_data.employee_number, form_data.password)
+    user = authenticate_user(db, request_data.employee_number, request_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -170,6 +174,14 @@ def update_room(room_id: int, room: schemas.RoomUpdate, db: Session = Depends(ge
     if updated_room is None:
         raise HTTPException(status_code=404, detail="Room not found")
     return updated_room
+
+
+@app.get("/rooms/{room_id}", response_model=schemas.Room)
+def read_room(room_id: int, db: Session = Depends(get_db)):
+    room = crud.get_room_by_id(db, room_id=room_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return room
 
 
 # 予約関連のAPI

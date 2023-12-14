@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 import models, schemas
 from models import Booking, GuestUser, User
 from security import verify_password, hash_password
+from typing import List
+from fastapi import HTTPException
 
 
 # 既存のユーザー一覧を取得する関数
@@ -73,7 +75,20 @@ def create_room(db: Session, room: schemas.RoomCreate):
 
 
 # 予約を登録する
-def create_booking(db: Session, booking: schemas.Booking):
+def create_booking(db: Session, booking: schemas.BookingCreate):
+    # 対象の部屋が役員専用かどうかを確認
+    room = db.query(models.Room).filter(models.Room.room_id == booking.room_id).first()
+    if room and room.executive:
+        # 役員専用の部屋の場合、ユーザーが役員かどうかをチェック
+        user = (
+            db.query(models.User).filter(models.User.user_id == booking.user_id).first()
+        )
+        if not user or user.role != "役員":
+            raise HTTPException(
+                status_code=400, detail="Only executives can book executive rooms"
+            )
+
+    # 予約処理
     db_booking = models.Booking(
         user_id=booking.user_id,
         room_id=booking.room_id,
@@ -287,3 +302,53 @@ def create_guest_user_with_booking_id(db: Session, name, email, booking_id):
 # ゲストユーザー一覧を取得する
 def get_guest_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.GuestUser).offset(skip).limit(limit).all()
+
+
+# 複数のゲストユーザーを登録する関数
+def create_guest_users_with_booking_id(
+    db: Session, guest_users: List[schemas.GuestUserCreate], booking_id: int
+):
+    for guest_user in guest_users:
+        db_guest_user = models.GuestUser(
+            name=guest_user.name, email=guest_user.email, booking_id=booking_id
+        )
+        db.add(db_guest_user)
+    db.commit()
+    return (
+        db.query(models.GuestUser)
+        .filter(models.GuestUser.booking_id == booking_id)
+        .all()
+    )
+
+
+# 予約時のキャパシティチェックを行う関数
+def check_room_capacity(db: Session, room_id: int, number_of_guests: int) -> bool:
+    room = db.query(models.Room).filter(models.Room.room_id == room_id).first()
+    if room and room.capacity >= number_of_guests:
+        return True
+    return False
+
+
+# 予約とゲストの登録を行う関数
+def create_booking_with_guests(
+    db: Session,
+    booking_data: schemas.BookingCreate,
+    guest_users: List[schemas.GuestUserCreate],
+):
+    # キャパシティチェック
+    if not check_room_capacity(
+        db, booking_data.room_id, booking_data.booked_num + len(guest_users)
+    ):
+        raise Exception("Room capacity exceeded")
+
+    # 予約作成
+    new_booking = create_booking(db, booking_data)
+
+    # ゲストユーザー作成
+    create_guest_users_with_booking_id(db, guest_users, new_booking.booking_id)
+    return new_booking
+
+
+# 特定の会議室をIDで取得する関数
+def get_room_by_id(db: Session, room_id: int):
+    return db.query(models.Room).filter(models.Room.room_id == room_id).first()
