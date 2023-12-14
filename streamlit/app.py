@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from datetime import datetime
 
 # FastAPIサーバーのURL
 BASE_URL = "http://127.0.0.1:8000"
@@ -18,7 +19,7 @@ def create_user():
     with st.form("Create User"):
         username = st.text_input("Username", max_chars=12)
         email = st.text_input("Email")
-        role = st.text_input("Role", max_chars=12)
+        role = st.selectbox("Role", ["社員", "役員", "管理者"])
         employee_number = st.text_input("Employee Number")  # 社員番号の入力フィールドを追加
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Create")
@@ -44,7 +45,7 @@ def update_user():
         user_id = st.text_input("User ID")
         username = st.text_input("Username")
         email = st.text_input("Email")
-        role = st.text_input("Role")
+        role = st.selectbox("Role", ["社員", "役員", "管理者"])
         employee_number = st.text_input("Employee Number")  # 社員番号の入力フィールドを追加
         submitted = st.form_submit_button("Update")
         if submitted:
@@ -155,16 +156,16 @@ def list_bookings():
             st.write(booking)
 
 
-from datetime import datetime
-
-
 def create_booking():
+    # 現在の日時を取得し、ISOフォーマット（'YYYY-MM-DDTHH:MM:SS'）に変換
+    current_datetime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
     with st.form("Create Booking"):
         user_id = st.number_input("User ID", min_value=1, format="%d")
         room_id = st.number_input("Room ID", min_value=1, format="%d")
         booked_num = st.number_input("Booked Num", min_value=1, format="%d")
-        start_datetime = st.text_input("Start Datetime", "2021-01-01T01:00:00")
-        end_datetime = st.text_input("End Datetime", "2021-01-01T02:00:00")
+        start_datetime = st.text_input("Start Datetime", current_datetime)
+        end_datetime = st.text_input("End Datetime", current_datetime)  # 初期値も現在の日時に設定
         submitted = st.form_submit_button("Create")
         if submitted:
             try:
@@ -282,6 +283,101 @@ def delete_guest_user():
                 st.error("Failed to delete guest user")
 
 
+def list_executive_booking():
+    # 役員用の予約リスト表示機能
+    response = requests.get(f"{BASE_URL}/bookings/")
+    if response.status_code == 200:
+        bookings = response.json()
+        for booking in bookings:
+            st.write(booking)
+
+
+def create_executive_booking():
+    with st.form("Create Executive Booking"):
+        user_id = st.number_input("User ID (Executive)", min_value=1, format="%d")
+        room_id = st.number_input("Room ID", min_value=1, format="%d")
+
+        # guest_names を初期化
+        guest_names = []
+
+        # 会議室のキャパシティを取得
+        room_response = requests.get(f"{BASE_URL}/rooms/{room_id}")
+        if room_response.status_code == 200:
+            room_capacity = room_response.json()["capacity"]
+            guest_names = []
+            # キャパシティに応じてゲストユーザーの入力欄を追加
+            for i in range(1, room_capacity):
+                guest_name = st.text_input(f"Guest {i} Name")
+                if guest_name:
+                    guest_names.append(guest_name)
+        else:
+            st.error("Failed to retrieve room capacity")
+
+        start_datetime = st.text_input("Start Datetime", "2021-01-01T01:00:00")
+        end_datetime = st.text_input("End Datetime", "2021-01-01T02:00:00")
+        submitted = st.form_submit_button("Create Booking")
+        if submitted:
+            try:
+                # 予約データを送信
+                response = requests.post(
+                    f"{BASE_URL}/bookings/",
+                    json={
+                        "user_id": user_id,
+                        "room_id": room_id,
+                        "booked_num": len(guest_names) + 1,  # メイン予約者を含む
+                        "start_datetime": start_datetime,
+                        "end_datetime": end_datetime,
+                    },
+                )
+                if response.status_code == 200:
+                    st.success("Booking created successfully!")
+                else:
+                    st.error(f"Failed to create booking: {response.text}")
+            except ValueError as e:
+                st.error(f"Invalid date format: {e}")
+
+
+def update_executive_booking():
+    with st.form("Update Executive Booking"):
+        booking_id = st.text_input("Booking ID")
+        new_user_id = st.number_input("New User ID", min_value=1, format="%d")
+        new_room_id = st.number_input("New Room ID", min_value=1, format="%d")
+        new_booked_num = st.number_input("New Booked Number", min_value=1, format="%d")
+        new_start_datetime = st.text_input("New Start Datetime", "2021-01-01T01:00:00")
+        new_end_datetime = st.text_input("New End Datetime", "2021-01-01T02:00:00")
+
+        submitted = st.form_submit_button("Update")
+        if submitted:
+            # 予約更新処理
+            update_data = {
+                "user_id": new_user_id,
+                "room_id": new_room_id,
+                "booked_num": new_booked_num,
+                "start_datetime": new_start_datetime,
+                "end_datetime": new_end_datetime,
+            }
+            response = requests.put(
+                f"{BASE_URL}/bookings/{booking_id}",
+                json=update_data,
+            )
+            if response.status_code == 200:
+                st.success("Booking updated successfully!")
+            else:
+                st.error(f"Failed to update booking: {response.text}")
+
+
+def delete_executive_booking():
+    with st.form("Delete Executive Booking"):
+        booking_id = st.text_input("Booking ID")
+        submitted = st.form_submit_button("Delete")
+        if submitted:
+            response = requests.delete(f"{BASE_URL}/bookings/{booking_id}")
+            if response.status_code == 200:
+                st.success("Booking deleted successfully!")
+            else:
+                st.error("Failed to delete booking")
+
+
 # サイドバーのプルダウンメニュー
 option = st.sidebar.selectbox(
     "選択してください",
@@ -302,6 +398,10 @@ option = st.sidebar.selectbox(
         "ゲストユーザー作成",
         "ゲストユーザー更新",
         "ゲストユーザー削除",
+        "役員予約リスト",
+        "役員予約作成",
+        "役員予約更新",
+        "役員予約削除",
     ),
 )
 
@@ -339,5 +439,13 @@ elif option == "ゲストユーザー更新":
     update_guest_user()
 elif option == "ゲストユーザー削除":
     delete_guest_user()
+elif option == "役員予約リスト":
+    list_executive_booking()
+elif option == "役員予約作成":
+    create_executive_booking()
+elif option == "役員予約更新":
+    update_executive_booking()
+elif option == "役員予約削除":
+    delete_executive_booking()
 
 st.sidebar.markdown("[Next.jsアプリケーションに戻る](http://localhost:3000)")
