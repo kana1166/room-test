@@ -92,7 +92,6 @@ def create_booking(db: Session, booking: schemas.BookingCreate):
     db_booking = models.Booking(
         user_id=booking.user_id,
         room_id=booking.room_id,
-        booked_num=booking.booked_num,
         start_datetime=booking.start_datetime,
         end_datetime=booking.end_datetime,
     )
@@ -207,7 +206,6 @@ def update_booking(
     if db_booking:
         db_booking.user_id = updated_booking.user_id
         db_booking.room_id = updated_booking.room_id
-        db_booking.booked_num = updated_booking.booked_num
         db_booking.start_datetime = updated_booking.start_datetime
         db_booking.end_datetime = updated_booking.end_datetime
         db.commit()
@@ -275,14 +273,17 @@ def delete_executive_room(db: Session, room_id: int):
 
 # 1. 予約を作成して自動生成された booking_id を取得
 def create_booking_with_auto_generated_id(
-    db: Session, user_id, room_id, start_datetime, end_datetime, booked_num
+    db: Session,
+    user_id,
+    room_id,
+    start_datetime,
+    end_datetime,
 ):
     new_booking = Booking(
         user_id=user_id,
         room_id=room_id,
         start_datetime=start_datetime,
         end_datetime=end_datetime,
-        booked_num=booked_num,
     )
     db.add(new_booking)
     db.commit()
@@ -330,22 +331,64 @@ def check_room_capacity(db: Session, room_id: int, number_of_guests: int) -> boo
 
 
 # 予約とゲストの登録を行う関数
-def create_booking_with_guests(
-    db: Session,
-    booking_data: schemas.BookingCreate,
-    guest_users: List[schemas.GuestUserCreate],
-):
-    # キャパシティチェック
-    if not check_room_capacity(
-        db, booking_data.room_id, booking_data.booked_num + len(guest_users)
-    ):
-        raise Exception("Room capacity exceeded")
+def create_booking_with_members(db: Session, booking_data: schemas.BookingCreate):
+    # 会議室のキャパシティチェック
+    room = (
+        db.query(models.Room)
+        .filter(models.Room.room_id == booking_data.room_id)
+        .first()
+    )
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
 
-    # 予約作成
-    new_booking = create_booking(db, booking_data)
+    total_members = len(booking_data.member_employee_numbers) + len(
+        booking_data.guest_names
+    )
+    if room.capacity < total_members:
+        raise HTTPException(status_code=400, detail="Room capacity exceeded")
 
-    # ゲストユーザー作成
-    create_guest_users_with_booking_id(db, guest_users, new_booking.booking_id)
+    # 代表者（社員）の存在チェック
+    main_user = (
+        db.query(models.User)
+        .filter(models.User.employee_number == booking_data.main_user_employee_number)
+        .first()
+    )
+    if not main_user:
+        raise HTTPException(status_code=404, detail="Main user not found")
+
+    # 予約の作成
+    new_booking = models.Booking(
+        main_user_id=main_user.user_id,
+        room_id=booking_data.room_id,
+        start_datetime=booking_data.start_datetime,
+        end_datetime=booking_data.end_datetime,
+    )
+    db.add(new_booking)
+    db.commit()
+    db.refresh(new_booking)
+
+    # 追加メンバー（社員）の登録
+    for employee_number in booking_data.member_employee_numbers:
+        user = (
+            db.query(models.User)
+            .filter(models.User.employee_number == employee_number)
+            .first()
+        )
+        if user:
+            booking_user = models.BookingUsers(
+                booking_id=new_booking.booking_id, user_id=user.user_id
+            )
+            db.add(booking_user)
+
+    # ゲストの登録
+    for guest_name in booking_data.guest_names:
+        guest_user = models.GuestUser(
+            name=guest_name, booking_id=new_booking.booking_id
+        )
+        db.add(guest_user)
+
+    db.commit()
+
     return new_booking
 
 

@@ -157,25 +157,56 @@ def list_bookings():
 
 
 def create_booking():
-    # 現在の日時を取得し、ISOフォーマット（'YYYY-MM-DDTHH:MM:SS'）に変換
     current_datetime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
     with st.form("Create Booking"):
-        user_id = st.number_input("User ID", min_value=1, format="%d")
         room_id = st.number_input("Room ID", min_value=1, format="%d")
-        user_id = st.number_input("User ID", min_value=1, format="%d")
-        booked_num = st.number_input("Booked Num", min_value=1, format="%d")
+        main_user_employee_number = st.text_input("Main User Employee Number")
+
+        # 部屋のキャパシティを取得して表示
+        room_capacity = get_room_capacity(room_id)
+        st.write(f"Room Capacity: {room_capacity}")
+
+        # 追加メンバーの社員番号とゲスト名の入力
+        additional_member_numbers = st.text_area("参加する社員は社員ID入力 (comma separated)")
+        guest_names = st.text_area("ゲストは名前入力 (comma separated)")
+
         start_datetime = st.text_input("Start Datetime", current_datetime)
-        end_datetime = st.text_input("End Datetime", current_datetime)  # 初期値も現在の日時に設定
-        submitted = st.form_submit_button("Create")
+        end_datetime = st.text_input("End Datetime", current_datetime)
+
+        submitted = st.form_submit_button("Create Booking")
         if submitted:
             try:
+                # ユーザー情報の取得
+                user_response = requests.get(
+                    f"{BASE_URL}/users/employee_number/{main_user_employee_number}"
+                )
+                if user_response.status_code != 200:
+                    st.error("Failed to retrieve user information.")
+                    return
+
+                user_info = user_response.json()
+                user_id = user_info["user_id"]
+
+                # 入力された追加メンバーとゲスト名をリストに変換
+                member_employee_numbers = [
+                    num.strip()
+                    for num in additional_member_numbers.split(",")
+                    if num.strip()
+                ]
+                guests = [
+                    name.strip() for name in guest_names.split(",") if name.strip()
+                ]
+
+                # 予約情報の送信
                 response = requests.post(
                     f"{BASE_URL}/bookings/",
                     json={
-                        "user_id": user_id,
                         "room_id": room_id,
-                        "booked_num": booked_num,
+                        "user_id": user_id,
+                        "main_user_employee_number": main_user_employee_number,
+                        "member_employee_numbers": member_employee_numbers,
+                        "guest_names": guests,
                         "start_datetime": start_datetime,
                         "end_datetime": end_datetime,
                     },
@@ -184,34 +215,77 @@ def create_booking():
                     st.success("Booking created successfully!")
                 else:
                     st.error(f"Failed to create booking: {response.text}")
-            except ValueError as e:
-                st.error(f"Invalid date format: {e}")
+
+            except requests.RequestException as e:
+                st.error(f"Network error: {e}")
+
+
+def get_room_capacity(room_id):
+    response = requests.get(f"{BASE_URL}/rooms/{room_id}")
+    if response.status_code == 200:
+        room = response.json()
+        return room.get("capacity", 0)
+    return 0
 
 
 def update_booking():
+    current_datetime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
     with st.form("Update Booking"):
         booking_id = st.text_input("Booking ID")
-        user_id = st.text_input("User ID")
-        room_id = st.text_input("Room ID")
-        booked_num = st.text_input("Booked Num")
-        start_datetime = st.text_input("Start Datetime")
-        end_datetime = st.text_input("End Datetime")
+        main_user_employee_number = st.text_input("Main User Employee Number")
+
+        # ユーザー情報の取得
+        user_response = requests.get(
+            f"{BASE_URL}/users/employee_number/{main_user_employee_number}"
+        )
+        if user_response.status_code == 200:
+            user_info = user_response.json()
+        else:
+            st.error("Failed to retrieve user information.")
+            return
+
+        room_id = st.number_input("Room ID", min_value=1, format="%d")
+
+        # 部屋のキャパシティを取得して表示
+        room_capacity = get_room_capacity(room_id)
+        st.write(f"Room Capacity: {room_capacity}")
+
+        additional_member_numbers = st.text_area("参加する社員は社員ID入力 (comma separated)")
+        guest_names = st.text_area("ゲストは名前入力 (comma separated)")
+        start_datetime = st.text_input("Start Datetime", current_datetime)
+        end_datetime = st.text_input("End Datetime", current_datetime)
+
         submitted = st.form_submit_button("Update")
         if submitted:
-            response = requests.put(
-                f"{BASE_URL}/bookings/{booking_id}",
-                json={
-                    "user_id": user_id,
-                    "room_id": room_id,
-                    "booked_num": booked_num,
-                    "start_datetime": start_datetime,
-                    "end_datetime": end_datetime,
-                },
-            )
-            if response.status_code == 200:
-                st.success("Booking updated successfully!")
-            else:
-                st.error("Failed to update booking")
+            try:
+                member_employee_numbers = [
+                    num.strip()
+                    for num in additional_member_numbers.split(",")
+                    if num.strip()
+                ]
+                guests = [
+                    name.strip() for name in guest_names.split(",") if name.strip()
+                ]
+
+                response = requests.put(
+                    f"{BASE_URL}/bookings/{booking_id}",
+                    json={
+                        "main_user_employee_number": main_user_employee_number,
+                        "member_employee_numbers": member_employee_numbers,
+                        "guest_names": guests,
+                        "room_id": room_id,
+                        "start_datetime": start_datetime,
+                        "end_datetime": end_datetime,
+                    },
+                )
+                if response.status_code == 200:
+                    st.success("Booking updated successfully!")
+                else:
+                    st.error("Failed to update booking")
+
+            except requests.RequestException as e:
+                st.error(f"Network error: {e}")
 
 
 def delete_booking():
@@ -294,38 +368,69 @@ def list_executive_booking():
 
 
 def create_executive_booking():
-    with st.form("Create Executive Booking"):
-        user_id = st.number_input("User ID (Executive)", min_value=1, format="%d")
-        room_id = st.number_input("Room ID", min_value=1, format="%d")
+    current_datetime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-        # guest_names を初期化
-        guest_names = []
+    st.subheader("Create Executive Booking")
+    employee_number = st.text_input("Employee Number")
+    check_role_button = st.button("Check Role")
 
-        # 会議室のキャパシティを取得
-        room_response = requests.get(f"{BASE_URL}/rooms/{room_id}")
-        if room_response.status_code == 200:
-            room_capacity = room_response.json()["capacity"]
-            guest_names = []
-            # キャパシティに応じてゲストユーザーの入力欄を追加
-            for i in range(1, room_capacity):
-                guest_name = st.text_input(f"Guest {i} Name")
-                if guest_name:
-                    guest_names.append(guest_name)
+    user_id = None
+    if check_role_button:
+        # 社員番号に基づいてユーザー情報を取得
+        user_response = requests.get(
+            f"{BASE_URL}/users/employee_number/{employee_number}"
+        )
+        if user_response.status_code == 200:
+            user_info = user_response.json()
+            st.write("User info:", user_info)  # ユーザー情報のデバッグ表示
+            if user_info["role"] != "役員":
+                st.error("Only executives are allowed to make bookings.")
+                return
+            user_id = user_info["user_id"]  # ユーザーIDを取得
+            st.success("Role verified: Executive")
         else:
-            st.error("Failed to retrieve room capacity")
+            st.error("Failed to retrieve user information.")
+            return
 
-        start_datetime = st.text_input("Start Datetime", "2021-01-01T01:00:00")
-        end_datetime = st.text_input("End Datetime", "2021-01-01T02:00:00")
-        submitted = st.form_submit_button("Create Booking")
-        if submitted:
+    if user_id:
+        with st.form("Create Executive Booking"):
+            room_id = st.number_input("Room ID", min_value=1, format="%d")
+            main_user_employee_number = st.text_input("Main User Employee Number")
+
+            # 部屋のキャパシティを取得して表示
+            room_capacity = get_room_capacity(room_id)
+            st.write(f"Room Capacity: {room_capacity}")
+
+            # 追加メンバーの社員番号とゲスト名の入力
+            additional_member_numbers = st.text_area("参加する社員は社員ID入力 (comma separated)")
+            guest_names = st.text_area("ゲストは名前入力 (comma separated)")
+
+            start_datetime = st.text_input("Start Datetime", current_datetime)
+            end_datetime = st.text_input("End Datetime", current_datetime)
+
+            submitted = st.form_submit_button("Create Booking")
+            member_employee_numbers = []
+            guests = []
+            if submitted:
+                # 入力された追加メンバーとゲスト名をリストに変換
+                member_employee_numbers = [
+                    num.strip()
+                    for num in additional_member_numbers.split(",")
+                    if num.strip()
+                ]
+                guests = [
+                    name.strip() for name in guest_names.split(",") if name.strip()
+                ]
+
             try:
-                # 予約データを送信
                 response = requests.post(
                     f"{BASE_URL}/bookings/",
                     json={
                         "user_id": user_id,
                         "room_id": room_id,
-                        "booked_num": len(guest_names) + 1,  # メイン予約者を含む
+                        "main_user_employee_number": main_user_employee_number,
+                        "member_employee_numbers": member_employee_numbers,
+                        "guest_names": guests,
                         "start_datetime": start_datetime,
                         "end_datetime": end_datetime,
                     },
@@ -341,9 +446,23 @@ def create_executive_booking():
 def update_executive_booking():
     with st.form("Update Executive Booking"):
         booking_id = st.text_input("Booking ID")
-        new_user_id = st.number_input("New User ID", min_value=1, format="%d")
+        new_employee_number = st.text_input("New Employee Number")
+
+        # 新しい社員番号に基づいてユーザー情報を取得
+        user_response = requests.get(
+            f"{BASE_URL}/users/employee_number/{new_employee_number}"
+        )
+        if user_response.status_code == 200:
+            new_user_info = user_response.json()
+            if new_user_info["role"] != "役員":
+                st.error("Only executives can update bookings.")
+                return
+            new_user_id = new_user_info["user_id"]
+        else:
+            st.error("Failed to retrieve user information.")
+            return
+
         new_room_id = st.number_input("New Room ID", min_value=1, format="%d")
-        new_booked_num = st.number_input("New Booked Number", min_value=1, format="%d")
         new_start_datetime = st.text_input("New Start Datetime", "2021-01-01T01:00:00")
         new_end_datetime = st.text_input("New End Datetime", "2021-01-01T02:00:00")
 
@@ -353,13 +472,11 @@ def update_executive_booking():
             update_data = {
                 "user_id": new_user_id,
                 "room_id": new_room_id,
-                "booked_num": new_booked_num,
                 "start_datetime": new_start_datetime,
                 "end_datetime": new_end_datetime,
             }
             response = requests.put(
-                f"{BASE_URL}/bookings/{booking_id}",
-                json=update_data,
+                f"{BASE_URL}/bookings/{booking_id}", json=update_data
             )
             if response.status_code == 200:
                 st.success("Booking updated successfully!")
@@ -370,6 +487,21 @@ def update_executive_booking():
 def delete_executive_booking():
     with st.form("Delete Executive Booking"):
         booking_id = st.text_input("Booking ID")
+        employee_number = st.text_input("Your Employee Number")
+
+        # 社員番号に基づいてユーザー情報を取得
+        user_response = requests.get(
+            f"{BASE_URL}/users/employee_number/{employee_number}"
+        )
+        if user_response.status_code == 200:
+            user_info = user_response.json()
+            if user_info["role"] != "役員":
+                st.error("Only executives can delete bookings.")
+                return
+        else:
+            st.error("Failed to retrieve user information.")
+            return
+
         submitted = st.form_submit_button("Delete")
         if submitted:
             response = requests.delete(f"{BASE_URL}/bookings/{booking_id}")

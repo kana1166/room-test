@@ -128,6 +128,14 @@ def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return users
 
 
+@app.get("/users/{user_id}", response_model=schemas.User)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    user = crud.get_user(db, user_id=user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
 @app.post("/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return crud.create_user(db=db, user=user)
@@ -287,3 +295,15 @@ def delete_executive_room(room_id: int, db: Session = Depends(get_db)):
 def read_guest_page():
     # ゲストユーザー用のコンテンツを提供
     return {"message": "Welcome to the guest page!"}
+
+
+@app.get("/users/employee_number/{employee_number}", response_model=schemas.User)
+def read_user_by_employee_number(employee_number: str, db: Session = Depends(get_db)):
+    user = (
+        db.query(models.User)
+        .filter(models.User.employee_number == employee_number)
+        .first()
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user

@@ -1,8 +1,8 @@
 # schemas.py
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from datetime import datetime
 from passlib.context import CryptContext
-from typing import Optional
+from typing import Optional, List
 from pydantic import constr
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -76,12 +76,17 @@ class BookingBase(BaseModel):
     room_id: int
     start_datetime: datetime
     end_datetime: datetime
-    booked_num: int
 
 
 # 予約の作成用スキーマ
-class BookingCreate(BookingBase):
-    pass
+class BookingCreate(BaseModel):
+    user_id: int
+    room_id: int
+    main_user_employee_number: str
+    member_employee_numbers: List[str]
+    guest_names: List[str]
+    start_datetime: datetime
+    end_datetime: datetime
 
 
 # 予約の更新用スキーマ
