@@ -32,6 +32,9 @@ class Booking(Base):
     user_id = Column(
         Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
     )
+    main_user_id = Column(
+        Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
+    )
     room_id = Column(
         Integer, ForeignKey("rooms.room_id", ondelete="SET NULL"), nullable=True
     )
@@ -55,5 +58,4 @@ class GuestUser(Base):
     __tablename__ = "guest_users"
     guest_user_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255))
-    email = Column(String(255), unique=True, index=True)
     booking_id = Column(Integer, ForeignKey("bookings.booking_id"), nullable=True)

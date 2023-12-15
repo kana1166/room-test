@@ -163,6 +163,7 @@ def create_booking():
     with st.form("Create Booking"):
         user_id = st.number_input("User ID", min_value=1, format="%d")
         room_id = st.number_input("Room ID", min_value=1, format="%d")
+        user_id = st.number_input("User ID", min_value=1, format="%d")
         booked_num = st.number_input("Booked Num", min_value=1, format="%d")
         start_datetime = st.text_input("Start Datetime", current_datetime)
         end_datetime = st.text_input("End Datetime", current_datetime)  # 初期値も現在の日時に設定
