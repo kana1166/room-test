@@ -8,7 +8,7 @@ from session import SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 import jwt
@@ -36,7 +36,7 @@ def verify_password(plain_password, hashed_password):
 
 
 # JWTトークンの生成
-def create_access_token(*, data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -99,6 +99,7 @@ async def get_current_user(
 class LoginRequest(BaseModel):
     employee_number: str
     password: str
+    role: Optional[str] = Field(None, pattern="^(社員|役員|管理者)$")
 
 
 @app.post("/token")
@@ -114,7 +115,7 @@ async def login_for_access_token(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"user_id": user.user_id, "role": user.role},
+        data={"user_id": user.user_id, "role": user.role},  # 役割を含める
         expires_delta=access_token_expires,
     )
     return {"access_token": access_token, "token_type": "bearer"}
