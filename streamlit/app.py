@@ -1,9 +1,22 @@
 import streamlit as st
 import requests
 from datetime import datetime
+import hashlib
 
 # FastAPIサーバーのURL
 BASE_URL = "http://127.0.0.1:8000"
+
+
+def generate_hash(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
+
+
+def check_auth(username, password):
+    correct_username = "user"
+    correct_password = generate_hash("123")
+    if username == correct_username and generate_hash(password) == correct_password:
+        return True
+    return False
 
 
 # ユーザー関連の関数
@@ -511,35 +524,64 @@ def delete_executive_booking():
                 st.error("Failed to delete booking")
 
 
-# サイドバーのプルダウンメニュー
-option = st.sidebar.selectbox(
-    "選択してください",
-    (
-        "ユーザーリスト",
-        "ユーザー作成",
-        "ユーザー更新",
-        "ユーザー削除",
-        "会議室リスト",
-        "会議室作成",
-        "会議室更新",
-        "会議室削除",
-        "予約リスト",
-        "予約作成",
-        "予約更新",
-        "予約削除",
-        "ゲストユーザーリスト",
-        "ゲストユーザー作成",
-        "ゲストユーザー更新",
-        "ゲストユーザー削除",
-        "役員予約リスト",
-        "役員予約作成",
-        "役員予約更新",
-        "役員予約削除",
-    ),
-)
+if "login" not in st.session_state:
+    st.session_state["login"] = False
+
+
+def login():
+    if st.session_state.get("login", False):  # ログイン済みの場合
+        st.subheader("Logout")
+        st.write("You are currently logged in.")
+        if st.button("Logout,2click"):
+            st.session_state["login"] = False
+            st.info("Logged out successfully!")
+    else:  # 未ログインの場合
+        st.subheader("Login")
+        with st.form("Login Form"):  # フォームを作成
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Login,2click")
+            if submitted:
+                if check_auth(username, password):
+                    st.session_state["login"] = True
+                    st.success("Logged in successfully!")
+                else:
+                    st.error("Incorrect username or password")
+
+
+option = None
+
+# フォームの外でログイン状態を確認
+if st.session_state["login"]:
+    option = st.sidebar.selectbox(
+        "選択してください",
+        (
+            "ユーザーリスト",
+            "ユーザー作成",
+            "ユーザー更新",
+            "ユーザー削除",
+            "会議室リスト",
+            "会議室作成",
+            "会議室更新",
+            "会議室削除",
+            "予約リスト",
+            "予約作成",
+            "予約更新",
+            "予約削除",
+            "ゲストユーザーリスト",
+            "ゲストユーザー作成",
+            "ゲストユーザー更新",
+            "ゲストユーザー削除",
+            "役員予約リスト",
+            "役員予約作成",
+            "役員予約更新",
+            "役員予約削除",
+        ),
+    )
 
 
 # 選択されたオプションに応じて機能を表示
+
 if option == "ユーザーリスト":
     list_users()
 elif option == "ユーザー作成":
@@ -582,3 +624,6 @@ elif option == "役員予約削除":
     delete_executive_booking()
 
 st.sidebar.markdown("[Next.jsアプリケーションに戻る](http://localhost:3000)")
+
+if __name__ == "__main__":
+    login()
