@@ -110,7 +110,7 @@ def get_user_role(db: Session, user_id: int) -> str:
 # ゲストユーザーを登録する
 def create_guest_user(db: Session, guest_user: schemas.GuestUserCreate):
     db_guest_user = models.GuestUser(
-        name=guest_user.name, email=guest_user.email, booking_id=guest_user.booking_id
+        name=guest_user.name, booking_id=guest_user.booking_id
     )
     db.add(db_guest_user)
     db.commit()
@@ -225,8 +225,7 @@ def update_guest_user(
     )
     if db_guest_user:
         db_guest_user.name = updated_guest_user.name
-        db_guest_user.email = updated_guest_user.email
-        db_guest_user.reservation_id = updated_guest_user.reservation_id
+        db_guest_user.booking_id = updated_guest_user.booking_id
         db.commit()
         db.refresh(db_guest_user)
         return db_guest_user
@@ -292,8 +291,8 @@ def create_booking_with_auto_generated_id(
 
 
 # 2. 生成された booking_id を使用してゲストユーザーを登録
-def create_guest_user_with_booking_id(db: Session, name, email, booking_id):
-    guest_user = GuestUser(name=name, email=email, booking_id=booking_id)
+def create_guest_user_with_booking_id(db: Session, name, booking_id):
+    guest_user = GuestUser(name=name, booking_id=booking_id)
     db.add(guest_user)
     db.commit()
     db.refresh(guest_user)
@@ -310,9 +309,7 @@ def create_guest_users_with_booking_id(
     db: Session, guest_users: List[schemas.GuestUserCreate], booking_id: int
 ):
     for guest_user in guest_users:
-        db_guest_user = models.GuestUser(
-            name=guest_user.name, email=guest_user.email, booking_id=booking_id
-        )
+        db_guest_user = models.GuestUser(name=guest_user.name, booking_id=booking_id)
         db.add(db_guest_user)
     db.commit()
     return (

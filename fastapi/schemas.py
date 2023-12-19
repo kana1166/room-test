@@ -104,8 +104,7 @@ class Booking(BookingBase):
 
 # ゲストユーザーの基本情報
 class GuestUserBase(BaseModel):
-    name: str
-    email: str
+    name: str = Field(max_length=255)
 
 
 # ゲストユーザーの作成用スキーマ
@@ -125,3 +124,12 @@ class GuestUser(GuestUserBase):
 
     class Config:
         orm_mode = True
+
+
+class Participant(BaseModel):
+    name: str
+    employee_number: str
+
+
+class BookingWithParticipants(BaseModel):
+    participants: List[Participant]
