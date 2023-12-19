@@ -13,6 +13,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 import jwt
 from jwt import PyJWTError
+import logging
 
 # JWTトークンの設定
 SECRET_KEY = "your_secret_key"  # 実際のアプリでは安全なランダムキーを使用する
@@ -207,6 +208,23 @@ def create_booking(booking: schemas.BookingCreate, db: Session = Depends(get_db)
 
 @app.delete("/bookings/{booking_id}")
 def delete_booking(booking_id: int, db: Session = Depends(get_db)):
+    db_booking = (
+        db.query(models.Booking).filter(models.Booking.booking_id == booking_id).first()
+    )
+
+    if db_booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    cancel_deadline = db_booking.start_datetime - timedelta(minutes=30)
+
+    if datetime.utcnow() >= cancel_deadline:
+        # ログ出力
+        logging.info(f"Attempt to cancel booking {booking_id} after deadline")
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot cancel reservation within 30 minutes of start time",
+        )
+
     if crud.delete_booking(db=db, booking_id=booking_id):
         return {"message": "Booking deleted"}
     else:
