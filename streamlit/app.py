@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from datetime import datetime
 import hashlib
+import pytz
 
 # FastAPIサーバーのURL
 BASE_URL = "http://127.0.0.1:8000"
@@ -17,6 +18,43 @@ def check_auth(username, password):
     if username == correct_username and generate_hash(password) == correct_password:
         return True
     return False
+
+
+# UTCからローカルタイムゾーンへの変換関数
+def convert_utc_to_local(utc_datetime_str, local_tz_str):
+    utc_datetime = datetime.strptime(utc_datetime_str, "%Y-%m-%dT%H:%M:%S")
+    utc_datetime = utc_datetime.replace(tzinfo=pytz.utc)
+    local_tz = pytz.timezone(local_tz_str)
+    local_datetime = utc_datetime.astimezone(local_tz)
+    return local_datetime.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+# ローカルタイムゾーンからUTCへの変換関数
+def convert_local_to_utc(local_datetime_str, local_tz_str):
+    local_tz = pytz.timezone(local_tz_str)
+    local_datetime = datetime.strptime(local_datetime_str, "%Y-%m-%dT%H:%M:%S")
+    local_datetime = local_tz.localize(local_datetime)
+    utc_datetime = local_datetime.astimezone(pytz.utc)
+    return utc_datetime.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+# デバッグ用の日時
+local_tz_str = "Asia/Tokyo"
+local_datetime_str = "2023-12-20T10:00:00"  # ローカルタイムゾーン（東京）のサンプル日時
+
+# ローカルからUTCへの変換
+utc_datetime_str = convert_local_to_utc(local_datetime_str, local_tz_str)
+print(f"Local to UTC: {local_datetime_str} -> {utc_datetime_str}")
+
+# UTCからローカルへの変換
+converted_local_datetime_str = convert_utc_to_local(utc_datetime_str, local_tz_str)
+print(f"UTC to Local: {utc_datetime_str} -> {converted_local_datetime_str}")
+
+# 最初のローカル日時と最終的なローカル日時の比較
+if local_datetime_str == converted_local_datetime_str:
+    print("変換は正確です。")
+else:
+    print("変換に問題があります。")
 
 
 # ユーザー関連の関数
@@ -165,12 +203,23 @@ def list_bookings():
     response = requests.get(f"{BASE_URL}/bookings/")
     if response.status_code == 200:
         bookings = response.json()
+        local_tz_str = "Asia/Tokyo"  # 例として東京のタイムゾーンを使用
         for booking in bookings:
+            # UTCからローカルタイムゾーンへの変換
+            booking["start_datetime"] = convert_utc_to_local(
+                booking["start_datetime"], local_tz_str
+            )
+            booking["end_datetime"] = convert_utc_to_local(
+                booking["end_datetime"], local_tz_str
+            )
             st.write(booking)
 
 
 def create_booking():
-    current_datetime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    # 現在の日時を取得し、ローカルタイムゾーンに変換
+    current_utc_datetime = datetime.now(pytz.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    local_tz_str = "Asia/Tokyo"
+    current_local_datetime = convert_utc_to_local(current_utc_datetime, local_tz_str)
 
     with st.form("Create Booking"):
         room_id = st.number_input("Room ID", min_value=1, format="%d")
@@ -182,15 +231,29 @@ def create_booking():
         additional_member_numbers = st.text_area("参加する社員は社員ID入力 (comma separated)")
         guest_names = st.text_area("ゲストは名前入力 (comma separated)")
 
-        start_datetime = st.text_input("Start Datetime", current_datetime)
-        end_datetime = st.text_input("End Datetime", current_datetime)
+        # Streamlitのstateを使用して日時を取得
+        if "start_datetime" not in st.session_state:
+            st.session_state["start_datetime"] = current_local_datetime
+        if "end_datetime" not in st.session_state:
+            st.session_state["end_datetime"] = current_local_datetime
+
+        start_datetime = st.text_input(
+            "Start Datetime", st.session_state["start_datetime"]
+        )
+        end_datetime = st.text_input("End Datetime", st.session_state["end_datetime"])
+
+        print(f"User Input - Start Datetime: {start_datetime}")
+        print(f"User Input - End Datetime: {end_datetime}")
 
         submitted = st.form_submit_button("Create Booking")
         if submitted:
+            st.session_state["start_datetime"] = start_datetime
+            st.session_state["end_datetime"] = end_datetime
             try:
                 user_response = requests.get(
                     f"{BASE_URL}/users/employee_number/{main_user_employee_number}"
                 )
+
                 if user_response.status_code != 200:
                     st.error("Failed to retrieve user information.")
                     return
@@ -207,6 +270,12 @@ def create_booking():
                     name.strip() for name in guest_names.split(",") if name.strip()
                 ]
 
+                # UTCに戻すための変換
+                start_datetime_utc = convert_local_to_utc(start_datetime, local_tz_str)
+                end_datetime_utc = convert_local_to_utc(end_datetime, local_tz_str)
+                print(f"Converted to UTC - Start Datetime: {start_datetime_utc}")
+                print(f"Converted to UTC - End Datetime: {end_datetime_utc}")
+
                 response = requests.post(
                     f"{BASE_URL}/bookings/",
                     json={
@@ -215,8 +284,8 @@ def create_booking():
                         "main_user_employee_number": main_user_employee_number,
                         "member_employee_numbers": member_employee_numbers,
                         "guest_names": guests,
-                        "start_datetime": start_datetime,
-                        "end_datetime": end_datetime,
+                        "start_datetime": start_datetime_utc,
+                        "end_datetime": end_datetime_utc,
                     },
                 )
                 if response.status_code == 200:
@@ -237,11 +306,10 @@ def get_room_capacity(room_id):
 
 
 def update_booking():
-    # 初期値の設定
-    if "current_datetime" not in st.session_state:
-        st.session_state["current_datetime"] = datetime.now().strftime(
-            "%Y-%m-%dT%H:%M:%S"
-        )
+    # 現在の日時を取得し、ローカルタイムゾーンに変換
+    current_utc_datetime = datetime.now(pytz.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    local_tz_str = "Asia/Tokyo"
+    current_local_datetime = convert_utc_to_local(current_utc_datetime, local_tz_str)
 
     with st.form("Update Booking"):
         booking_id = st.text_input("Booking ID")
@@ -249,12 +317,18 @@ def update_booking():
         room_id = st.number_input("Room ID", min_value=1, format="%d")
         additional_member_numbers = st.text_area("参加する社員は社員ID入力 (comma separated)")
         guest_names = st.text_area("ゲストは名前入力 (comma separated)")
+        # Streamlitのstateを使用して日時を取得
+        if "start_datetime" not in st.session_state:
+            st.session_state["start_datetime"] = current_local_datetime
+        if "end_datetime" not in st.session_state:
+            st.session_state["end_datetime"] = current_local_datetime
+
         start_datetime = st.text_input(
-            "Start Datetime", st.session_state["current_datetime"]
+            "Start Datetime", st.session_state["start_datetime"]
         )
-        end_datetime = st.text_input(
-            "End Datetime", st.session_state["current_datetime"]
-        )
+        end_datetime = st.text_input("End Datetime", st.session_state["end_datetime"])
+
+        print(f"User Input - Start Datetime: {start_datetime}")
 
         submitted = st.form_submit_button("Update")
 
@@ -282,6 +356,9 @@ def update_booking():
             ]
             guests = [name.strip() for name in guest_names.split(",") if name.strip()]
 
+            start_datetime_utc = convert_local_to_utc(start_datetime, local_tz_str)
+            end_datetime_utc = convert_local_to_utc(end_datetime, local_tz_str)
+
             # 予約の更新処理
             try:
                 response = requests.put(
@@ -292,8 +369,8 @@ def update_booking():
                         "member_employee_numbers": member_employee_numbers,
                         "guest_names": guests,
                         "room_id": room_id,
-                        "start_datetime": start_datetime,
-                        "end_datetime": end_datetime,
+                        "start_datetime": start_datetime_utc,
+                        "end_datetime": end_datetime_utc,
                     },
                 )
                 if response.status_code == 200:
@@ -391,12 +468,23 @@ def list_executive_booking():
     response = requests.get(f"{BASE_URL}/bookings/")
     if response.status_code == 200:
         bookings = response.json()
+        local_tz_str = "Asia/Tokyo"
         for booking in bookings:
+            # UTCからローカルタイムゾーンへの変換
+            booking["start_datetime"] = convert_utc_to_local(
+                booking["start_datetime"], local_tz_str
+            )
+            booking["end_datetime"] = convert_utc_to_local(
+                booking["end_datetime"], local_tz_str
+            )
             st.write(booking)
 
 
 def create_executive_booking():
-    current_datetime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    # 現在の日時を取得し、ローカルタイムゾーンに変換
+    current_utc_datetime = datetime.now(pytz.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    local_tz_str = "Asia/Tokyo"
+    current_local_datetime = convert_utc_to_local(current_utc_datetime, local_tz_str)
 
     st.subheader("Create Executive Booking")
     employee_number = st.text_input("Employee Number")
@@ -404,12 +492,23 @@ def create_executive_booking():
     main_user_employee_number = st.text_input("Main User Employee Number")
     additional_member_numbers = st.text_area("参加する社員は社員ID入力 (comma separated)")
     guest_names = st.text_area("ゲストは名前入力 (comma separated)")
-    start_datetime = st.text_input("Start Datetime", current_datetime)
-    end_datetime = st.text_input("End Datetime", current_datetime)
+
+    # Streamlitのstateを使用して日時を取得
+    if "start_datetime" not in st.session_state:
+        st.session_state["start_datetime"] = current_local_datetime
+    if "end_datetime" not in st.session_state:
+        st.session_state["end_datetime"] = current_local_datetime
+
+    start_datetime = st.text_input("Start Datetime", st.session_state["start_datetime"])
+    end_datetime = st.text_input("End Datetime", st.session_state["end_datetime"])
 
     submit_button = st.button("Check Role and Create Booking")
 
     if submit_button:
+        # UTCに戻すための変換
+        start_datetime_utc = convert_local_to_utc(start_datetime, local_tz_str)
+        end_datetime_utc = convert_local_to_utc(end_datetime, local_tz_str)
+
         # 社員番号に基づいてユーザー情報を取得
         user_response = requests.get(
             f"{BASE_URL}/users/employee_number/{employee_number}"
@@ -442,8 +541,8 @@ def create_executive_booking():
                         "main_user_employee_number": main_user_employee_number,
                         "member_employee_numbers": member_employee_numbers,
                         "guest_names": guests,
-                        "start_datetime": start_datetime,
-                        "end_datetime": end_datetime,
+                        "start_datetime": start_datetime_utc,
+                        "end_datetime": end_datetime_utc,
                     },
                 )
                 if response.status_code == 200:
@@ -457,16 +556,37 @@ def create_executive_booking():
 
 
 def update_executive_booking():
+    # 現在の日時を取得し、ローカルタイムゾーンに変換
+    current_utc_datetime = datetime.now(pytz.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    local_tz_str = "Asia/Tokyo"
+    current_local_datetime = convert_utc_to_local(current_utc_datetime, local_tz_str)
+
     with st.form("Update Executive Booking"):
         booking_id = st.text_input("Booking ID")
         new_employee_number = st.text_input("New Employee Number")
         new_room_id = st.number_input("New Room ID", min_value=1, format="%d")
-        new_start_datetime = st.text_input("New Start Datetime", "2021-01-01T01:00:00")
-        new_end_datetime = st.text_input("New End Datetime", "2021-01-01T02:00:00")
+        # Streamlitのstateを使用してデフォルトの日時を設定
+        if "new_start_datetime" not in st.session_state:
+            st.session_state["new_start_datetime"] = current_local_datetime
+        if "new_end_datetime" not in st.session_state:
+            st.session_state["new_end_datetime"] = current_local_datetime
+
+        new_start_datetime = st.text_input(
+            "New Start Datetime", st.session_state["new_start_datetime"]
+        )
+        new_end_datetime = st.text_input(
+            "New End Datetime", st.session_state["new_end_datetime"]
+        )
 
         submitted = st.form_submit_button("Check Role and Update Booking")
 
         if submitted:
+            # UTCに戻すための変換
+            new_start_datetime_utc = convert_local_to_utc(
+                new_start_datetime, local_tz_str
+            )
+            new_end_datetime_utc = convert_local_to_utc(new_end_datetime, local_tz_str)
+
             # 新しい社員番号に基づいてユーザー情報を取得
             user_response = requests.get(
                 f"{BASE_URL}/users/employee_number/{new_employee_number}"
@@ -482,8 +602,8 @@ def update_executive_booking():
                 update_data = {
                     "user_id": new_user_id,
                     "room_id": new_room_id,
-                    "start_datetime": new_start_datetime,
-                    "end_datetime": new_end_datetime,
+                    "start_datetime": new_start_datetime_utc,
+                    "end_datetime": new_end_datetime_utc,
                 }
                 response = requests.put(
                     f"{BASE_URL}/bookings/{booking_id}", json=update_data
