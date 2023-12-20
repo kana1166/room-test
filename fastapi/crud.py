@@ -329,21 +329,6 @@ def check_room_capacity(db: Session, room_id: int, number_of_guests: int) -> boo
 
 # 予約とゲストの登録を行う関数
 def create_booking_with_members(db: Session, booking_data: schemas.BookingCreate):
-    # 会議室のキャパシティチェック
-    room = (
-        db.query(models.Room)
-        .filter(models.Room.room_id == booking_data.room_id)
-        .first()
-    )
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    total_members = len(booking_data.member_employee_numbers) + len(
-        booking_data.guest_names
-    )
-    if room.capacity < total_members:
-        raise HTTPException(status_code=400, detail="Room capacity exceeded")
-
     # 代表者（社員）の存在チェック
     main_user = (
         db.query(models.User)

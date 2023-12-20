@@ -9,14 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel, Field
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 import jwt
 from jwt import PyJWTError
 import logging
 
 # JWTトークンの設定
-SECRET_KEY = "your_secret_key"  # 実際のアプリでは安全なランダムキーを使用する
+SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -203,7 +203,31 @@ def read_bookings(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 
 @app.post("/bookings/", response_model=schemas.Booking)
 def create_booking(booking: schemas.BookingCreate, db: Session = Depends(get_db)):
-    return crud.create_booking(db=db, booking=booking)
+    # 予約の作成と代表者の確認
+    new_booking = crud.create_booking(db=db, booking=booking)
+
+    # 追加メンバー（社員）の登録
+    for employee_number in booking.member_employee_numbers:
+        user = (
+            db.query(models.User)
+            .filter(models.User.employee_number == employee_number)
+            .first()
+        )
+    if user:
+        booking_user = models.BookingUsers(
+            booking_id=new_booking.booking_id, user_id=user.user_id
+        )
+        db.add(booking_user)
+    # ゲストの登録
+    for guest_name in booking.guest_names:
+        crud.create_guest_user(
+            db=db,
+            guest_user=schemas.GuestUserCreate(
+                name=guest_name, booking_id=new_booking.booking_id
+            ),
+        )
+
+    return new_booking
 
 
 @app.delete("/bookings/{booking_id}")
@@ -222,7 +246,7 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
         logging.info(f"Attempt to cancel booking {booking_id} after deadline")
         raise HTTPException(
             status_code=400,
-            detail="Cannot cancel reservation within 30 minutes of start time",
+            detail="開始30分切っているためキャンセルできません",
         )
 
     if crud.delete_booking(db=db, booking_id=booking_id):

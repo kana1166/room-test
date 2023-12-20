@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import jwt, JWTError
+from jose import jwt
 
-SECRET_KEY = "secretkey"  # 安全なキーに置き換えてください
+SECRET_KEY = "secretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
