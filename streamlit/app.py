@@ -67,11 +67,11 @@ def list_users():
 
 
 def create_user():
-    with st.form("Create User"):
-        username = st.text_input("Username", max_chars=12)
+    with st.form("ユーザー作成"):
+        username = st.text_input("名前", max_chars=12)
         email = st.text_input("Email")
         role = st.selectbox("Role", ["社員", "役員", "管理者"])
-        employee_number = st.text_input("Employee Number")  # 社員番号の入力フィールドを追加
+        employee_number = st.text_input("社員番号入力")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Create")
         if submitted:
@@ -86,18 +86,18 @@ def create_user():
                 },
             )
             if response.status_code == 200:
-                st.success("User created successfully!")
+                st.success("作成完了！")
             else:
                 st.error(f"Failed to create user: {response.text}")
 
 
 def update_user():
-    with st.form("Update User"):
-        user_id = st.text_input("User ID")
-        username = st.text_input("Username")
+    with st.form("ユーザー更新"):
+        user_id = st.text_input("ユーザー ID")
+        username = st.text_input("名前", max_chars=12)
         email = st.text_input("Email")
         role = st.selectbox("Role", ["社員", "役員", "管理者"])
-        employee_number = st.text_input("Employee Number")  # 社員番号の入力フィールドを追加
+        employee_number = st.text_input("社員番号入力")
         submitted = st.form_submit_button("Update")
         if submitted:
             response = requests.put(
@@ -106,19 +106,19 @@ def update_user():
                     "username": username,
                     "email": email,
                     "role": role,
-                    "employee_number": employee_number,  # 社員番号をJSONに含める
+                    "employee_number": employee_number,
                 },
             )
             if response.status_code == 200:
-                st.success("User updated successfully!")
+                st.success("更新完了！")
             else:
                 st.error("Failed to update user")
 
 
 def delete_user():
-    with st.form("Delete User"):
-        user_id = st.text_input("User ID")
-        submitted = st.form_submit_button("Delete")
+    with st.form("ユーザー削除"):
+        user_id = st.text_input("ユーザー ID")
+        submitted = st.form_submit_button("削除")
         if submitted:
             response = requests.delete(f"{BASE_URL}/users/{user_id}")
             if response.status_code == 200:
@@ -137,11 +137,11 @@ def list_rooms():
 
 
 def create_room():
-    with st.form("Create Room"):
-        room_name = st.text_input("Room Name")
-        capacity = st.number_input("Capacity", min_value=1, format="%d")  # 数字入力
-        photo_url = st.text_input("Photo URL")
-        executive = st.selectbox("Executive", ["Yes", "No"])  # ドロップダウンメニュー
+    with st.form("会議室作成"):
+        room_name = st.text_input("会議室名")
+        capacity = st.number_input("人数", min_value=1, format="%d")  # 数字入力
+        photo_url = st.text_input("写真 URL")
+        executive = st.selectbox("役員専用ですか？", ["Yes", "No"])  # ドロップダウンメニュー
         submitted = st.form_submit_button("Create")
         if submitted:
             # executiveの値をブーリアンに変換
@@ -157,13 +157,13 @@ def create_room():
                 },
             )
             if response.status_code == 200:
-                st.success("Room created successfully!")
+                st.success("会議室作成完了！")
             else:
                 st.error("Failed to create room")
 
 
 def update_room():
-    with st.form("Update Room"):
+    with st.form("会議室更新"):
         room_id = st.text_input("Room ID")
         room_name = st.text_input("Room Name")
         capacity = st.text_input("Capacity")
@@ -187,7 +187,7 @@ def update_room():
 
 
 def delete_room():
-    with st.form("Delete Room"):
+    with st.form("会議室削除"):
         room_id = st.text_input("Room ID")
         submitted = st.form_submit_button("Delete")
         if submitted:
@@ -221,7 +221,7 @@ def create_booking():
     local_tz_str = "Asia/Tokyo"
     current_local_datetime = convert_utc_to_local(current_utc_datetime, local_tz_str)
 
-    with st.form("Create Booking"):
+    with st.form("予約作成"):
         room_id = st.number_input("Room ID", min_value=1, format="%d")
         main_user_employee_number = st.text_input("Main User Employee Number")
 
@@ -275,6 +275,19 @@ def create_booking():
                 end_datetime_utc = convert_local_to_utc(end_datetime, local_tz_str)
                 print(f"Converted to UTC - Start Datetime: {start_datetime_utc}")
                 print(f"Converted to UTC - End Datetime: {end_datetime_utc}")
+
+                booking_data = {
+                    "room_id": room_id,
+                    "user_id": user_id,
+                    "main_user_employee_number": main_user_employee_number,
+                    "member_employee_numbers": member_employee_numbers,
+                    "guest_names": guests,
+                    "start_datetime": start_datetime_utc,
+                    "end_datetime": end_datetime_utc,
+                }
+
+                print("Sending booking request with the following data:")
+                print(booking_data)
 
                 response = requests.post(
                     f"{BASE_URL}/bookings/",
@@ -663,7 +676,7 @@ def login():
             if submitted:
                 if check_auth(username, password):
                     st.session_state["login"] = True
-                    st.success("Logged in successfully!")
+                    st.success("ログイン成功！")
                 else:
                     st.error("Incorrect username or password")
 
