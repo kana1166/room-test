@@ -5,7 +5,7 @@ import hashlib
 import pytz
 
 # FastAPIサーバーのURL
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "https://54.87.195.13:8000"
 
 
 def generate_hash(password):
